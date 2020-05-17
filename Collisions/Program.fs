@@ -22,6 +22,7 @@ module CommonFunctional =
     let (<**) f x y z = f (x, y, z)
 
 open CommonFunctional
+open System
 
 [<Struct>]
 type Vector(x: double, y: double) =
@@ -41,12 +42,22 @@ type Vector(x: double, y: double) =
 
 
 
-type PointMass(pos: Vector, vel: Vector, mass: double) =
+type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
+    /// <summary>
+    /// Unique id for every points that is not changed in process
+    /// </summary>
+    new(pos, vel, mass) as this =
+        PointMass(pos, vel, mass, Guid.NewGuid())
+        then printfn "Point's id is %A" this.Id
+
+    member val private Id = id
     member val Position = pos
     member val Mass = mass
     member val Velocity = vel
-    member private this.WithVelocity vel = PointMass(this.Position, vel, this.Mass)
-    member private this.WithPosition pos = PointMass(pos, this.Velocity, this.Mass)
+    member this.WithVelocity vel = PointMass(this.Position, vel, this.Mass, this.Id)
+    member this.WithPosition pos = PointMass(pos, this.Velocity, this.Mass, this.Id)
+    static member areSame (p1: PointMass) (p2: PointMass) = p1.Id.Equals p2.Id
+
 
     member this.ApplyForce (force: Vector) (dt: double) =
         force
@@ -56,8 +67,7 @@ type PointMass(pos: Vector, vel: Vector, mass: double) =
 
     member this.Move dt =
         this.Position
-        + this.Velocity
-        * dt
+        + (this.Velocity * dt)
         |> this.WithPosition
 
     static member applyForce force dt (pm: PointMass) = pm.ApplyForce force dt
@@ -72,7 +82,7 @@ type PointMass(pos: Vector, vel: Vector, mass: double) =
 
 module Forces =
     let simpleDown value =
-        fun points dt -> List.map (PointMass.applyForce (Vector(0., -value)) dt) points
+        fun (points: list<PointMass>) dt -> List.map (PointMass.applyForce (Vector(0., value)) dt) points
 
     let gravityBetweenTwo (points: list<PointMass>) dt =
         let fst = points.Head
@@ -92,14 +102,14 @@ module Forces =
         [ fst.ApplyForce (fromFstToSnd * forceMagnitude) dt
           snd.ApplyForce (fromFstToSnd * (-forceMagnitude)) dt ]
 
-    let commonBetweenObjects (forceFromFstToSnd : PointMass->PointMass->Vector) = 
-        fun points dt -> 
-            List.map (fun point ->
-            List.map (forceFromFstToSnd point) points
-            |> List.fold (+) Vector.Zero
-            |> swap point.ApplyForce dt)
+    let commonBetweenTwoObjects (forceFromFstToSnd: PointMass -> PointMass -> Vector) =
+        fun (points: list<PointMass>) dt ->
+            swap List.map points (fun point ->
+                List.map (forceFromFstToSnd point) points
+                |> List.fold (+) Vector.Zero
+                |> swap point.ApplyForce dt)
 
-    let gravity (points: list<PointMass>) dt =
+    let gravity =
         let force (toPoint: PointMass) (fromPoint: PointMass) =
             if (obj.ReferenceEquals(toPoint, fromPoint)) then
                 Vector.Zero
@@ -113,11 +123,7 @@ module Forces =
                 direction
                 * (toPoint.Mass * fromPoint.Mass / sqrMagnitude)
 
-        points
-        |> List.map (fun point ->
-            List.map (force point) points
-            |> List.fold (+) Vector.Zero
-            |> swap point.ApplyForce dt)
+        commonBetweenTwoObjects force
 
     let gravityToCenter center mass =
         let ms = swap List.map
@@ -128,6 +134,20 @@ module Forces =
             * (mass * p.Mass / (pown magn 2))
 
         fun (points: list<PointMass>) dt -> List.map (fun p -> PointMass.applyForce (force p) dt p) points
+
+    let collideWithBottom (bottom: double) =
+        fun (points: list<PointMass>) dt ->
+            let apply (point: PointMass) =
+                if point.Position.Y > bottom then
+                    Vector(point.Velocity.X, -point.Velocity.Y)
+                    |> point.WithVelocity
+                else
+                    point
+
+            List.map apply points
+
+
+
 
 
 
@@ -187,12 +207,10 @@ let rec startWindow () =
         State
             (*             ([ PointMass(Vector(300., 200.), Vector(0.03, 0.03), 1.)
                PointMass(Vector(200., 200.), Vector(-0.02, -0.03), 1.) ], *)
-            ([ PointMass(Vector(500., 200.), Vector(0.00, -0.17), 1.)
-               PointMass(Vector(100., 200.), Vector(0.00, 0.17), 1.)
-               //    PointMass(Vector(200., 200.), Vector(-0.00, -0.09), 1.)
-               PointMass(Vector(300., 200.), Vector.Zero, 20.) ],
+            ([ PointMass(Vector(100., 200.), Vector(0.02, 0.00), 1.) ],
              90,
-             [ Forces.gravity ])
+             [ Forces.collideWithBottom 500.
+               Forces.simpleDown 0.00005 ])
 
     printfn "Creating window"
     new RenderWindow(VideoMode(800u, 600u), "Window")
