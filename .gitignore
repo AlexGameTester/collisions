@@ -1,0 +1,10 @@
+
+.fake
+.ionide
+/Collisions/obj
+/Collisions/bin
+.vscode
+dotnet
+Collisions/.tabnine_root
+/CollisionTests/obj
+/CollisionTests/bin
