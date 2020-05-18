@@ -5,8 +5,8 @@ open SFML.Window
 open System.Threading.Tasks
 open System.Threading
 
-open Core.CommonFunctional
-open Core
+open CollisionsCore.CommonFunctional
+open CollisionsCore
 
 
 let getNext (state: State) = state.GetNext()
@@ -40,13 +40,16 @@ let startDrawing (inititalState: State) window =
 
 let startWindow inNewThread =
     let inititalState =
+        let points =
+            [ PointMass(Vector(100., 200.), Vector(0.003, -0.005), 30.)
+              PointMass(Vector(200., 200.), Vector(0.000, -0.000), 1.) ]
+
         State
-            (*             ([ PointMass(Vector(300., 200.), Vector(0.03, 0.03), 1.)
-               PointMass(Vector(200., 200.), Vector(-0.02, -0.03), 1.) ], *)
-            ([ PointMass(Vector(100., 200.), Vector(0.02, 0.00), 1.) ],
+            (points,
              90,
              [ Forces.collideWithBottom 500.
-               Forces.simpleDown 0.00005 ])
+               Forces.simpleDown 0.00005 ],
+             [])
 
     printfn "Creating window"
     new RenderWindow(VideoMode(800u, 600u), "Window")

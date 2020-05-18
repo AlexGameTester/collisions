@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="Core.fs" />
     <Compile Include="Forces.fs" />
+    <Compile Include="Joints.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

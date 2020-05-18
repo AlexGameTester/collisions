@@ -1,7 +1,8 @@
 module Forces
 
-open Core
-open Core.CommonFunctional
+open CollisionsCore
+open CollisionsCore.CommonFunctional
+
 
 
 let simpleDown value =

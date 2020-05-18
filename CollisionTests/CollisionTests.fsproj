@@ -6,6 +6,9 @@
     <ProjectReference Include="../Collisions/Collisions.fsproj">
       <Name>Collisions.fsproj</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Collisions\Collisions.fsproj">
+      <Name>Collisions.fsproj</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="UnitTest1.fs" />

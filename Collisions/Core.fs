@@ -1,4 +1,4 @@
-module Core
+module CollisionsCore
 
 open SFML.System
 open System
@@ -32,25 +32,39 @@ type Vector(x: double, y: double) =
     static member magnitude(v: Vector) = v.Magnitude
     static member toV2f(v: Vector) = Vector2f(float32 v.X, float32 v.Y)
     static member normalized(v: Vector) = v.Normalized
+
+    //This method is probably not correct 'cause coordinates here have different directions and rotation from usual in maths
+    static member rotate angle (v: Vector) =
+        let x =
+            v.X * Math.Cos angle - v.Y * Math.Sin angle
+
+        let y =
+            v.X * Math.Sin angle + v.Y * Math.Cos angle
+
+        Vector(x, y)
+
+    static member perpendicular = Vector.rotate (Math.PI / 2.)
     static member Zero = Vector(0., 0.)
+    override this.ToString() = String.Format("Vector of ({0}, {1})", this.X, this.Y)
 
 
 
 type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
     /// <summary>
-    /// Unique id for every points that is not changed in process
+    /// Unique id for every points that is not changed in process of movement
     /// </summary>
     new(pos, vel, mass) as this =
         PointMass(pos, vel, mass, Guid.NewGuid())
         then printfn "Point's id is %A" this.Id
 
-    member val private Id = id
+    member val Id = id
     member val Position = pos
     member val Mass = mass
     member val Velocity = vel
     member this.WithVelocity vel = PointMass(this.Position, vel, this.Mass, this.Id)
     member this.WithPosition pos = PointMass(pos, this.Velocity, this.Mass, this.Id)
-    static member areSame (p1: PointMass) (p2: PointMass) = p1.Id.Equals p2.Id
+    static member AreSame (p1: PointMass) (p2: PointMass) = p1.Id.Equals p2.Id
+    static member CompareId (id: Guid) (p: PointMass) = id.Equals p.Id
 
 
     member this.ApplyForce (force: Vector) (dt: double) =
@@ -74,23 +88,33 @@ type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
             va.Append point
             window.Draw va *)
 
-[<StructAttribute>]
-type State(points: list<PointMass>, framerate: int, forceFunctions: list<list<PointMass> -> double -> list<PointMass>>) =
+type ForceFunction = list<PointMass> -> double -> list<PointMass>
+
+type JointFunction = ForceFunction
+
+[<Struct>]
+type State(points: list<PointMass>, framerate: int, forceFunctions: list<ForceFunction>, joints: list<JointFunction>) =
     member _.ForceFunctions = forceFunctions
+    member _.Joints = joints
     member private _.dt = 1000. / (double framerate)
     member _.Framerate = framerate
     member _.Points = points
-    member private this.WithPoints points = State(points, this.Framerate, this.ForceFunctions)
+    member private this.WithPoints points = State(points, this.Framerate, this.ForceFunctions, this.Joints)
 
     member this.GetNext() =
         let move = List.map (PointMass.move this.dt)
 
-        let applyForces (state: State) =
-            let rec apply dt forces points =
-                match forces with
-                | head :: fs -> head points dt |> apply dt fs
-                | [] -> points
+        let rec apply dt funcs points =
+            match funcs with
+            | func :: otherFuncs -> func points dt |> apply dt otherFuncs
+            | [] -> points
 
+        let applyForces (state: State) =
             apply state.dt state.ForceFunctions state.Points
 
-        applyForces this |> move |> this.WithPoints
+        let applyJoints dt joints points = apply dt joints points
+
+        applyForces this
+        |> applyJoints this.dt this.Joints
+        |> move
+        |> this.WithPoints
