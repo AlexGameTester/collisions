@@ -8,3 +8,4 @@ dotnet
 Collisions/.tabnine_root
 /CollisionTests/obj
 /CollisionTests/bin
+.vs
