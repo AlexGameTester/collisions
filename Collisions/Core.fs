@@ -48,21 +48,21 @@ type Vector(x: double, y: double) =
     override this.ToString() = String.Format("Vector of ({0}, {1})", this.X, this.Y)
 
 
-
 type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
-    /// <summary>
-    /// Unique id for every points that is not changed in process of movement
-    /// </summary>
     new(pos, vel, mass) as this =
         PointMass(pos, vel, mass, Guid.NewGuid())
         then printfn "Point's id is %A" this.Id
 
+    /// <summary>
+    /// Unique id for every points that is not changed in process of movement
+    /// </summary>
     member val Id = id
     member val Position = pos
     member val Mass = mass
     member val Velocity = vel
     member this.WithVelocity vel = PointMass(this.Position, vel, this.Mass, this.Id)
     member this.WithPosition pos = PointMass(pos, this.Velocity, this.Mass, this.Id)
+    member this.WithOffset offset = this.WithPosition(offset + this.Position)
     static member AreSame (p1: PointMass) (p2: PointMass) = p1.Id.Equals p2.Id
     static member CompareId (id: Guid) (p: PointMass) = id.Equals p.Id
 
@@ -73,7 +73,10 @@ type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
         + this.Velocity
         |> this.WithVelocity
 
-    member this.Move dt =
+    //TODO: Temporary made virtual for tests
+    abstract Move: double -> PointMass
+
+    default this.Move dt =
         this.Position
         + (this.Velocity * dt)
         |> this.WithPosition

@@ -5,8 +5,13 @@ open CollisionsCore.CommonFunctional
 open System
 
 let getConstDistance (p1: PointMass) (p2: PointMass) =
+    let error = double 1.0e-5
+
+    let initialDistance =
+        p1.Position - p2.Position |> Vector.magnitude
+
     let constDistance (id1: Guid) (id2: Guid) =
-        fun (points: list<PointMass>) (_: double) ->
+        fun (points: list<PointMass>) (dt: double) ->
             let p1 =
                 List.find (PointMass.CompareId id1) points
 
@@ -24,16 +29,17 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
                     not (PointMass.CompareId id1 p)
                     && not (PointMass.CompareId id2 p)
 
-            let p1ImpulseOnAxis =
-                p1.Velocity * p1.Mass |> Vector.dot fromFstToSnd
-
-            let p2ImpulseOnAxis =
-                p2.Velocity * p2.Mass |> Vector.dot fromFstToSnd
-
             let newVelocity =
-                p1ImpulseOnAxis
-                + p2ImpulseOnAxis
+                let p1ImpulseOnAxis =
+                    p1.Velocity * p1.Mass |> Vector.dot fromFstToSnd
+
+                let p2ImpulseOnAxis =
+                    p2.Velocity * p2.Mass |> Vector.dot fromFstToSnd
+
+                (p1ImpulseOnAxis + p2ImpulseOnAxis)
                 / (p1.Mass + p2.Mass)
+
+            // printfn "New velocity is %f" newVelocity
 
             let apply =
                 fun (p: PointMass) ->
@@ -43,6 +49,49 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
 
                     p.WithVelocity(fromFstToSnd * newVelocity + perpendicularVelocity)
 
-            [ apply p1; apply p2 ] @ otherPoints
+            let supressDistanceChanges (p1: PointMass) (p2: PointMass) =
+                let dist =
+                    p1.Position - p2.Position |> Vector.magnitude
+
+                let difference = dist - initialDistance
+                if Math.Abs difference > error then
+                    let additionalVelocityPerMass =
+                        difference / (2. * dt * p1.Mass * p2.Mass)
+
+                    printfn "Distance %f is too big. Adding %f velocity per unit of mass" dist additionalVelocityPerMass
+                    [ p1.WithVelocity
+                        (p1.Velocity
+                         + fromFstToSnd
+                         * additionalVelocityPerMass
+                         * p1.Mass)
+                      p2.WithVelocity
+                          (p2.Velocity
+                           + fromFstToSnd
+                           * (-additionalVelocityPerMass * p2.Mass)) ]
+                else
+                    [ p1; p2 ]
+
+            (*                 if Math.Abs difference > error then
+                    let differencePerMass = difference / (p1.Mass + p2.Mass)
+                    [ p1.WithOffset(fromFstToSnd * (differencePerMass * p1.Mass))
+                      p2.WithOffset(fromFstToSnd * (-differencePerMass * p2.Mass)) ]
+                else
+                    [ p1; p2 ] *)
+
+
+
+            supressDistanceChanges (apply p1) (apply p2)
+            // [ apply p1; apply p2 ]
+            |> fun lst ->
+                let dist =
+                    lst.[0].Position
+                    - lst.[1].Position
+                    |> Vector.magnitude
+
+                if Math.Abs(initialDistance - dist)
+                   / initialDistance > 0.03 then
+                    printfn "Distance changed dramatically"
+                lst
+            |> (@) otherPoints
 
     constDistance p1.Id p2.Id

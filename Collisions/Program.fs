@@ -41,15 +41,16 @@ let startDrawing (inititalState: State) window =
 let startWindow inNewThread =
     let inititalState =
         let points =
-            [ PointMass(Vector(100., 200.), Vector(0.003, -0.005), 30.)
-              PointMass(Vector(200., 200.), Vector(0.000, -0.000), 1.) ]
+            [ PointMass(Vector(300., 300.), Vector(0.000, 0.000), 1.0e12)
+              PointMass(Vector(300., 600.), Vector(0.05, 0.000), 1.)
+              PointMass(Vector(300., 450.), Vector(0.04, 0.000), 1.) ]
 
         State
             (points,
-             90,
-             [ Forces.collideWithBottom 500.
-               Forces.simpleDown 0.00005 ],
-             [])
+             60,
+             [ Forces.simpleDown 0.000007 ],
+             [ Joints.getConstDistance points.[0] points.[1]
+               Joints.getConstDistance points.[1] points.[2] ])
 
     printfn "Creating window"
     new RenderWindow(VideoMode(800u, 600u), "Window")
