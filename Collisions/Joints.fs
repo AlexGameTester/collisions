@@ -5,7 +5,7 @@ open CollisionsCore.CommonFunctional
 open System
 
 let getConstDistance (p1: PointMass) (p2: PointMass) =
-    let error = double 1.0e-5
+    let error = 1.0e-8
 
     let initialDistance =
         p1.Position - p2.Position |> Vector.magnitude
@@ -22,6 +22,10 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
                 (p2.Position - p1.Position) |> Vector.normalized
 
             let perpendicular = fromFstToSnd |> Vector.perpendicular
+
+            printfn "Vectors are perpendicular up to the level of %f"
+            << Math.Log10
+            <| (Vector.dot perpendicular fromFstToSnd)
 
             let otherPoints =
                 swap List.filter points
@@ -49,6 +53,10 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
 
                     p.WithVelocity(fromFstToSnd * newVelocity + perpendicularVelocity)
 
+            // TODO: Change this 'cause velocity isn't vanished by previous code in
+            //       implulse conservation because of rotation of joint
+            //       Не смотря на то что импульс сохраняется, эта скорость не уничтожается взаимно
+            //       в манипуляциях с импульсом выше, т.к. связь (стержень) вращается
             let supressDistanceChanges (p1: PointMass) (p2: PointMass) =
                 let dist =
                     p1.Position - p2.Position |> Vector.magnitude
@@ -80,8 +88,8 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
 
 
 
-            supressDistanceChanges (apply p1) (apply p2)
-            // [ apply p1; apply p2 ]
+            // supressDistanceChanges (apply p1) (apply p2)
+            [ apply p1; apply p2 ]
             |> fun lst ->
                 let dist =
                     lst.[0].Position
@@ -90,7 +98,7 @@ let getConstDistance (p1: PointMass) (p2: PointMass) =
 
                 if Math.Abs(initialDistance - dist)
                    / initialDistance > 0.03 then
-                    printfn "Distance changed dramatically"
+                    printfn "Distance changed dramatically to %f" dist
                 lst
             |> (@) otherPoints
 
