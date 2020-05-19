@@ -4,6 +4,8 @@ open SFML.System
 open System
 
 module CommonFunctional =
+    ///<summary>Creates tuple from it's arguments </summary>
+    let pack x y = (x, y)
     /// <summary>
     /// Transforms carried function a->b->c to b->a->c (changes order of arguments)
     /// </summary>
@@ -12,11 +14,11 @@ module CommonFunctional =
     ///<summary>
     /// Transforms function of touple of 2 arguments into a carried function
     /// </summary>
-    let (<*) f x y = f (x, y)
+    let (<^) f x y = f (x, y)
     ///<summary>
     /// Transforms function of touple of 3 arguments into a carried function
     /// </summary>
-    let (<**) f x y z = f (x, y, z)
+    let (<^^) f x y z = f (x, y, z)
 
 [<Struct>]
 type Vector(x: double, y: double) =
@@ -91,7 +93,8 @@ type PointMass private (pos: Vector, vel: Vector, mass: double, id: Guid) =
             va.Append point
             window.Draw va *)
 
-type ForceFunction = list<PointMass> -> double -> list<PointMass>
+type Force = Vector
+type ForceFunction = list<Force * PointMass> -> double -> list<Force * PointMass>
 
 type JointFunction = ForceFunction
 
@@ -107,17 +110,28 @@ type State(points: list<PointMass>, framerate: int, forceFunctions: list<ForceFu
     member this.GetNext() =
         let move = List.map (PointMass.move this.dt)
 
-        let rec apply dt funcs points =
-            match funcs with
-            | func :: otherFuncs -> func points dt |> apply dt otherFuncs
-            | [] -> points
+        let accelerate dt (ffOutput: list<Force * PointMass>) =
+            let applyForce dt (force, point) = PointMass.applyForce force dt point
+            List.map (applyForce dt) ffOutput
 
-        let applyForces (state: State) =
-            apply state.dt state.ForceFunctions state.Points
 
-        let applyJoints dt joints points = apply dt joints points
+        let applyAll dt funcs initialPairs =
+            let rec apply dt (funcs: list<ForceFunction>) output =
+                match funcs with
+                | func :: otherFuncs -> func output dt |> apply dt otherFuncs
+                | [] -> output
 
-        applyForces this
-        |> applyJoints this.dt this.Joints
+            apply dt funcs initialPairs
+
+        let applyForces = applyAll this.dt this.ForceFunctions
+        let applyJoints = applyAll this.dt this.Joints
+
+        let initialPairs =
+            List.map (fun point -> (Vector.Zero, point)) this.Points
+
+
+        applyForces initialPairs
+        |> applyJoints
+        |> accelerate this.dt
         |> move
         |> this.WithPoints
